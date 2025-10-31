@@ -1,171 +1,109 @@
-# 🚀 Job-Pilot – AI-Powered Job Application & Resume Screening Platform (MERN Stack)
+🧭 Job-Pilot
 
-Welcome to **Job-Pilot**, a comprehensive, full-stack solution designed to automate and enhance the hiring process. This platform enables companies to manage job applications efficiently while offering candidates a smooth, modern experience.  
+Job-Pilot is a full-stack web application designed to connect job seekers and recruiters in a single platform.
+It provides an AI-powered job hiring system where candidates can apply for jobs, give coding and aptitude tests, and appear for interviews — while recruiters can manage applications, conduct interviews, and evaluate performance.
 
-By leveraging **AI-driven resume screening**, **multi-lingual support**, and **Cloudinary for secure file storage**, Job-Pilot revolutionizes the way recruitment works.
+🚀 Features
+👨‍💼 For Job Seekers:
 
----
+Create a professional profile and upload resumes.
 
-## 📋 Table of Contents
-- [Introduction](#-introduction)  
-- [Features](#-features)  
-- [Tech Stack](#-tech-stack)  
-- [Project Structure](#-project-structure)  
-- [Admin Dashboard](#️-admin-dashboard)  
-- [Candidate Experience](#-candidate-experience)  
-- [AI Integration](#-ai-integration)  
-- [Environment Setup](#-environment-setup)  
-- [Deployment](#-deployment)  
-- [Contributing](#-contributing)  
-- [License](#-license)
+Attempt aptitude and coding tests.
 
----
+Attend live interview sessions with screen-sharing support.
 
-## 🌟 Introduction
-**Job-Pilot** is built to streamline the recruitment process for companies and simplify job applications for candidates.  
-Admins can post jobs, review resumes, shortlist candidates, and communicate directly — while candidates can upload resumes, apply instantly, and receive AI-powered feedback.  
+Track application progress and results.
 
-Using advanced **AI models** like *Gemini 1.5 Flash* (or any other LLM), the system analyzes resumes, matches them against job requirements, and provides reasoning behind every shortlisting decision.
+🏢 For Recruiters / Companies:
 
----
+Post job openings with required skills and test details.
 
-## ✨ Features
+Review candidate profiles, test results, and interview feedback.
 
-### 🧩 Core Functionality
-#### 📄 Resume Upload & Parsing
-- Upload resumes in **PDF/DOCX** format  
-- Automatic parsing of key details (Name, Email, Skills, Experience, Education, Projects)  
-- Secure cloud storage via **Cloudinary**
+Conduct interviews directly through the platform.
 
-#### 📋 Job Postings for Companies
-- Post multiple job openings with titles, skills, experience level, and location  
-- Define shortlisting thresholds and track applications easily via MongoDB  
+Manage and track candidates efficiently.
 
-#### 🤖 AI-Driven Resume Matching
-- Smart resume evaluation based on skills, experience, and education  
-- AI fallback logic for deeper evaluation and reasoning  
+🔒 Authentication:
 
-#### 💬 Interactive Candidate Chatbot
-- Multilingual chatbot for application-related queries  
-- AI-driven, human-like interactions for better engagement  
+Secure login using Supabase Auth with Email-Password and LinkedIn OAuth.
 
-#### 📊 Admin Dashboard
-- View, filter, and shortlist resumes with AI-based scoring  
-- Transparent shortlisting with **AI explanations**
+💬 Interview System:
 
-#### 📨 In-App Messaging
-- Send personalized messages to candidates  
-- Manage interview notifications and rejections efficiently  
+Interviewer can view candidate’s screen and code in real time.
 
----
+Built-in code editor and chat for interaction.
 
-## 🛠️ Tech Stack
+🧠 AI Assistance:
 
-### **Frontend**
-- React.js  
-- React Router  
-- Axios  
-- Formik  
-- React-FA Icons  
-- Tailwind CSS (if used)  
+Integrated AI helper to generate coding questions and analyze responses.
 
-### **Backend**
-- Node.js  
-- Express.js  
-- MongoDB (Mongoose)  
-- JWT Authentication  
-- Multer (for file uploads)  
-- Cloudinary (for storage)
-
-### **AI / LLM**
-- Gemini 1.5 Flash (or equivalent AI model)  
-- Multilingual reasoning & text analysis
-
----
-
-## 🗂️ Project Structure
-\`\`\`
+🛠️ Tech Stack
+Layer	Technology
+Frontend	React.js, Vite, Tailwind CSS
+Backend	Node.js, Express.js
+Database	Supabase (PostgreSQL)
+Authentication	Supabase Auth (Email + LinkedIn OAuth)
+Cloud Storage	Supabase Storage
+Realtime Communication	WebRTC / Socket.io
+AI Integration	OpenAI / Gemini API (for question generation & evaluation)
+📂 Project Structure
 Job-Pilot/
-├── frontend/                # React.js Frontend
-│   ├── src/
-│   ├── public/
-│   └── package.json
+├── frontend/                     # React.js Frontend
+│   ├── src/                      # Main source code (components, pages, hooks)
+│   │   ├── components/           # UI Components (Navbar, Dashboard, etc.)
+│   │   ├── pages/                # App Pages (Login, Register, Test, Interview)
+│   │   ├── context/              # Global Context (Auth, Test, Interview)
+│   │   ├── utils/                # Helper functions (API calls, constants)
+│   │   └── App.jsx               # Root Component
+│   ├── public/                   # Static assets (icons, logos, index.html)
+│   └── package.json              # Frontend dependencies and scripts
 │
-├── backend/                 # Node.js Backend
-│   ├── controllers/         # API Controllers
-│   ├── models/              # MongoDB Models
-│   ├── routes/              # Express Routes
-│   ├── middleware/          # Auth Middleware
-│   ├── utils/               # Helper Functions
-│   ├── config/              # DB and Cloud Config
-│   └── server.js
+├── backend/                      # Node.js Backend
+│   ├── controllers/              # API Controllers (business logic)
+│   ├── models/                   # MongoDB Models (schemas)
+│   ├── routes/                   # Express Routes (API endpoints)
+│   ├── middleware/               # Authentication & authorization middleware
+│   ├── utils/                    # Helper functions (AI utils, resume parser)
+│   ├── config/                   # Database & cloud configuration
+│   └── server.js                 # Main server entry point
 │
-├── .env                     # Environment Variables
-└── README.md
-\`\`\`
+├── .env                          # Environment variables (API keys, DB URLs)
+└── README.md                     # Project documentation
 
----
+⚙️ Installation & Setup
+1️⃣ Clone the repository:
+git clone https://github.com/THE-DEEPDAS/Medhavi-Full.git
+cd Job-Pilot
 
+2️⃣ Setup Frontend:
+cd frontend
+npm install
+npm run dev
 
-## 🖥️ Admin Dashboard
-The **Admin Dashboard** empowers HR teams to:
-- **Manage Job Posts:** Create, update, and delete openings  
-- **Review Resumes:** View parsed resumes and AI evaluation scores  
-- **Communicate:** Message candidates directly via in-app tools  
-- **Analyze Jobs:** Track application stats and shortlisting progress  
-
----
-
-## 👩‍💻 Candidate Experience
-Candidates can:
-- Upload their resume (PDF/DOCX)  
-- Answer job-specific questions  
-- Get **instant AI-based feedback** on matching percentage  
-- Receive updates on their application status  
-
-Real-time insights help candidates improve future applications and tailor their resumes better.
-
----
-
-## 🧠 AI Integration
-- Uses **Gemini 1.5 Flash** (or similar LLM) for resume matching  
-- Generates shortlisting **scores + reasoning**  
-- Supports **multilingual responses** for global inclusivity  
-
----
-
-## ⚙️ Environment Setup
-Create a `.env` file in the `backend/` directory:
-
-\`\`\`env
-PORT=5100
-MONGO_URL=your_mongodb_url
-JWT_SECRET=your_jwt_secret
-CLOUD_NAME=your_cloudinary_name
-CLOUD_API_KEY=your_cloudinary_key
-CLOUD_API_SECRET=your_cloudinary_secret
-\`\`\`
-
-Then, install dependencies:
-\`\`\`bash
-# Backend
+3️⃣ Setup Backend:
 cd backend
 npm install
 npm run dev
 
-# Frontend
-cd ../frontend
-npm install
-npm run dev
-\`\`\`
+4️⃣ Configure Environment Variables:
 
----
+Create a .env file in the backend folder and add:
 
-## 🚀 Deployment
-You can deploy this project on:
-- **Frontend:** Vercel / Netlify  
-- **Backend:** Render / Railway / AWS / Azure  
-- **Database:** MongoDB Atlas  
-- **Cloud Storage:** Cloudinary  
+PORT=5100
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_supabase_api_key
+JWT_SECRET=your_secret_key
+OPENAI_API_KEY=your_openai_key
 
----
+🧩 Workflow
+
+User signs up or logs in using Supabase Auth.
+
+Job seeker completes profile and starts aptitude or coding tests.
+
+Recruiter posts jobs and reviews applicants’ performance.
+
+Interview round conducted with integrated screen-sharing and live code editor.
+
+Recruiter finalizes candidate and updates job status.
