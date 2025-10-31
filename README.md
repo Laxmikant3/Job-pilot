@@ -103,6 +103,8 @@ Job-Pilot/
 └── README.md                     # Project documentation
 
 
+
+
 ## 🖥️ Admin Dashboard
 The **Admin Dashboard** empowers HR teams to:
 - **Manage Job Posts:** Create, update, and delete openings  
