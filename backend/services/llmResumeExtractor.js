@@ -1,0 +1,407 @@
+/**
+ * LLM-based Resume Extractor
+ *
+ * This module uses an LLM to extract structured information from resume text.
+ * It passes the raw resume text to an LLM and asks it to return skills,
+ * experience, and projects as JSON objects.
+ */
+
+import { getLLMResponse } from "../utils/llm.js";
+
+/**
+ * Extract structured information from resume text using an LLM
+ * @param {string} resumeText - Raw text extracted from a resume
+ * @returns {Promise<Object>} - Structured resume data
+ */
+async function extractResumeDataWithLLM(resumeText) {
+  try {
+    console.log("Starting LLM-based resume extraction");
+
+    // Define the prompt for the LLM
+    const prompt = `You are a resume parsing assistant that must output ONLY valid JSON.
+STRICT REQUIREMENTS:
+- Output must be a single valid JSON object
+- Do not include any text or comments before or after the JSON
+- Do not include any explanations
+- All fields must be present in the output
+- Each skill should be 1-3 words maximum
+- If a field is missing or can't be determined, use empty string or empty array as appropriate
+
+Parse the following resume text and output EXACTLY this JSON structure:
+{
+  "skills": ["skill1", "skill2"],
+  "experience": [
+    {
+      "title": "Software Engineer",
+      "company": "Company Name",
+      "location": "City, State",
+      "startDate": "YYYY-MM",
+      "endDate": "YYYY-MM or null if current",
+      "description": "Job description"
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project Name",
+      "description": "Project description",
+      "technologies": ["tech1", "tech2"],
+      "url": "project url or empty string"
+    }
+  ]
+}
+
+Resume text to parse:
+${resumeText}`; // Call the LLM with the prompt
+    const llmResponse = await getLLMResponse(prompt);
+    console.log("Raw LLM Response received");
+
+    // Initialize empty structure for parsed data
+    let parsedData = {
+      skills: [],
+      experience: [],
+      projects: [],
+    };
+
+    // First, try to find the most complete JSON object in the response
+    // This regex looks for the pattern that most closely matches our expected structure
+    const fullJsonRegex =
+      /\{[\s\S]*?"skills"\s*:\s*\[[\s\S]*?\][\s\S]*?"experience"\s*:\s*\[[\s\S]*?\][\s\S]*?"projects"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/;
+    const completeJsonMatch = llmResponse.match(fullJsonRegex);
+
+    if (completeJsonMatch) {
+      // We found what looks like a complete JSON object with all three fields
+      try {
+        parsedData = JSON.parse(completeJsonMatch[0]);
+        console.log("Successfully parsed complete JSON object from response");
+      } catch (completeJsonError) {
+        console.log(
+          "Found complete-looking JSON but failed to parse it, trying to fix:",
+          completeJsonError
+        );
+
+        try {
+          // Try to fix the JSON
+          let fixedJson = completeJsonMatch[0]
+            .replace(/(\w+):/g, '"$1":') // Add quotes to keys
+            .replace(/'/g, '"') // Replace single quotes with double quotes
+            .replace(/,\s*}/g, "}") // Remove trailing commas
+            .replace(/,\s*]/g, "]"); // Remove trailing commas in arrays
+
+          parsedData = JSON.parse(fixedJson);
+          console.log("Successfully parsed fixed complete JSON");
+        } catch (fixError) {
+          console.log(
+            "Failed to fix complete JSON, falling back to partial extraction"
+          );
+        }
+      }
+    }
+
+    // If we couldn't parse a complete JSON object, try to extract individual sections
+    if (
+      !parsedData.skills.length &&
+      !parsedData.experience.length &&
+      !parsedData.projects.length
+    ) {
+      console.log(
+        "No complete JSON found or it was empty, extracting partial JSON objects"
+      );
+
+      // Look for JSON-like patterns that might contain our data
+      const jsonMatches = llmResponse.match(/(\{[\s\S]*?\})/g);
+
+      if (jsonMatches && jsonMatches.length > 0) {
+        console.log(
+          `Found ${jsonMatches.length} potential JSON fragments in LLM response`
+        );
+
+        // Sort matches by length - longer fragments are more likely to contain useful data
+        jsonMatches.sort((a, b) => b.length - a.length);
+
+        // Try each fragment, starting with the largest
+        for (const jsonCandidate of jsonMatches) {
+          // Skip very small fragments that are likely not useful
+          if (jsonCandidate.length < 20) continue;
+
+          try {
+            const candidateData = JSON.parse(jsonCandidate);
+
+            // Only merge if this candidate contains at least one of our expected fields
+            const hasRelevantData =
+              (Array.isArray(candidateData.skills) &&
+                candidateData.skills.length > 0) ||
+              (Array.isArray(candidateData.experience) &&
+                candidateData.experience.length > 0) ||
+              (Array.isArray(candidateData.projects) &&
+                candidateData.projects.length > 0);
+
+            if (hasRelevantData) {
+              // Merge skills if this fragment has them and our current data doesn't
+              if (
+                Array.isArray(candidateData.skills) &&
+                candidateData.skills.length > 0 &&
+                parsedData.skills.length === 0
+              ) {
+                parsedData.skills = candidateData.skills;
+                console.log(
+                  `Extracted skills from fragment: ${candidateData.skills.length} items`
+                );
+              }
+
+              // Merge experience if this fragment has it and our current data doesn't
+              if (
+                Array.isArray(candidateData.experience) &&
+                candidateData.experience.length > 0 &&
+                parsedData.experience.length === 0
+              ) {
+                parsedData.experience = candidateData.experience;
+                console.log(
+                  `Extracted experience from fragment: ${candidateData.experience.length} items`
+                );
+              }
+
+              // Merge projects if this fragment has them and our current data doesn't
+              if (
+                Array.isArray(candidateData.projects) &&
+                candidateData.projects.length > 0 &&
+                parsedData.projects.length === 0
+              ) {
+                parsedData.projects = candidateData.projects;
+                console.log(
+                  `Extracted projects from fragment: ${candidateData.projects.length} items`
+                );
+              }
+            }
+          } catch (err) {
+            // Try to fix and parse this candidate
+            try {
+              let fixedJson = jsonCandidate
+                .replace(/(\w+):/g, '"$1":') // Add quotes to keys
+                .replace(/'/g, '"') // Replace single quotes with double quotes
+                .replace(/,\s*}/g, "}") // Remove trailing commas
+                .replace(/,\s*]/g, "]"); // Remove trailing commas in arrays
+
+              const fixedData = JSON.parse(fixedJson);
+
+              // Only merge if this fixed candidate contains at least one of our expected fields
+              const hasRelevantData =
+                (Array.isArray(fixedData.skills) &&
+                  fixedData.skills.length > 0) ||
+                (Array.isArray(fixedData.experience) &&
+                  fixedData.experience.length > 0) ||
+                (Array.isArray(fixedData.projects) &&
+                  fixedData.projects.length > 0);
+
+              if (hasRelevantData) {
+                // Merge skills if this fragment has them and our current data doesn't
+                if (
+                  Array.isArray(fixedData.skills) &&
+                  fixedData.skills.length > 0 &&
+                  parsedData.skills.length === 0
+                ) {
+                  parsedData.skills = fixedData.skills;
+                  console.log(
+                    `Extracted skills from fixed fragment: ${fixedData.skills.length} items`
+                  );
+                }
+
+                // Merge experience if this fragment has it and our current data doesn't
+                if (
+                  Array.isArray(fixedData.experience) &&
+                  fixedData.experience.length > 0 &&
+                  parsedData.experience.length === 0
+                ) {
+                  parsedData.experience = fixedData.experience;
+                  console.log(
+                    `Extracted experience from fixed fragment: ${fixedData.experience.length} items`
+                  );
+                }
+
+                // Merge projects if this fragment has them and our current data doesn't
+                if (
+                  Array.isArray(fixedData.projects) &&
+                  fixedData.projects.length > 0 &&
+                  parsedData.projects.length === 0
+                ) {
+                  parsedData.projects = fixedData.projects;
+                  console.log(
+                    `Extracted projects from fixed fragment: ${fixedData.projects.length} items`
+                  );
+                }
+              }
+            } catch (fixErr) {
+              // Continue to the next candidate
+              console.log("Failed to parse JSON candidate, trying next one");
+            }
+          }
+        }
+      } else {
+        console.error("No JSON-like fragments found in LLM response");
+      }
+    }
+
+    // Create a normalized structure with default empty values
+    const normalizedData = {
+      skills: [],
+      experience: [],
+      projects: [],
+    };
+
+    // Normalize skills (ensure it's an array of strings)
+    if (Array.isArray(parsedData.skills)) {
+      normalizedData.skills = parsedData.skills
+        .filter((skill) => typeof skill === "string" && skill.trim().length > 0)
+        .map((skill) => skill.trim());
+    }
+
+    // Normalize experience (ensure it's an array of valid experience objects)
+    if (Array.isArray(parsedData.experience)) {
+      normalizedData.experience = parsedData.experience
+        .filter((exp) => exp && typeof exp === "object")
+        .map((exp) => ({
+          title: typeof exp.title === "string" ? exp.title.trim() : "",
+          company: typeof exp.company === "string" ? exp.company.trim() : "",
+          location: typeof exp.location === "string" ? exp.location.trim() : "",
+          startDate:
+            typeof exp.startDate === "string" ? exp.startDate.trim() : "",
+          endDate: exp.endDate
+            ? typeof exp.endDate === "string"
+              ? exp.endDate.trim()
+              : null
+            : null,
+          description:
+            typeof exp.description === "string" ? exp.description.trim() : "",
+        }))
+        .filter((exp) => exp.title || exp.company || exp.description); // Only keep entries with at least some content
+    }
+
+    // Normalize projects (ensure it's an array of valid project objects)
+    if (Array.isArray(parsedData.projects)) {
+      normalizedData.projects = parsedData.projects
+        .filter((proj) => proj && typeof proj === "object")
+        .map((proj) => ({
+          name: typeof proj.name === "string" ? proj.name.trim() : "",
+          description:
+            typeof proj.description === "string" ? proj.description.trim() : "",
+          technologies: Array.isArray(proj.technologies)
+            ? proj.technologies
+                .filter(
+                  (tech) => typeof tech === "string" && tech.trim().length > 0
+                )
+                .map((tech) => tech.trim())
+            : [],
+          url: typeof proj.url === "string" ? proj.url.trim() : "",
+        }))
+        .filter(
+          (proj) =>
+            proj.name ||
+            proj.description ||
+            (Array.isArray(proj.technologies) && proj.technologies.length > 0)
+        ); // Only keep entries with at least some content
+    }
+
+    console.log("Successfully extracted and normalized resume data");
+    return normalizedData;
+  } catch (error) {
+    console.error("Error extracting resume data with LLM:", error);
+    return {
+      skills: [],
+      experience: [],
+      projects: [],
+    };
+  }
+}
+
+/**
+ * Parse resume text using LLM and format the results
+ * @param {Buffer|string} pdfBuffer - PDF buffer or text content
+ * @returns {Promise<Object>} - Parsed resume data
+ */
+async function parseResumeWithLLM(pdfBuffer) {
+  try {
+    let rawText = "";
+
+    // Extract text from the PDF or use the provided text
+    if (Buffer.isBuffer(pdfBuffer)) {
+      try {
+        // Use PDF parsing library to get text
+        const pdfParse = (await import("pdf-parse")).default;
+        const fallbackData = await pdfParse(pdfBuffer, {
+          max: 15 * 1024 * 1024, // 15MB limit
+        });
+
+        if (
+          fallbackData &&
+          fallbackData.text &&
+          fallbackData.text.trim().length > 0
+        ) {
+          rawText = fallbackData.text;
+          console.log(
+            "PDF parsing successful, retrieved text length:",
+            rawText.length
+          );
+        } else {
+          // If the input might already be text, try to use it directly
+          rawText = pdfBuffer.toString("utf8");
+          console.log("Attempting to use buffer as text directly");
+        }
+      } catch (pdfError) {
+        console.error("Error parsing PDF:", pdfError);
+        // Try to use buffer as text directly as a last resort
+        try {
+          rawText = pdfBuffer.toString("utf8");
+          console.log("Attempting to use buffer as text directly");
+        } catch (textError) {
+          console.error("Failed to extract text:", textError);
+          return {
+            skills: [],
+            experience: [],
+            projects: [],
+            rawText: "",
+          };
+        }
+      }
+    } else if (typeof pdfBuffer === "string") {
+      // The input is already text
+      rawText = pdfBuffer;
+      console.log(`Using provided text content, length: ${rawText.length}`);
+    } else if (pdfBuffer && typeof pdfBuffer === "object" && pdfBuffer.text) {
+      // This might be the result of pdf-parse directly
+      rawText = pdfBuffer.text;
+      console.log(
+        `Using text from pdf-parse object, length: ${rawText.length}`
+      );
+    } else {
+      console.error("Invalid input type");
+      return {
+        skills: [],
+        experience: [],
+        projects: [],
+        rawText: "",
+      };
+    }
+
+    // Extract data using LLM
+    const extractedData = await extractResumeDataWithLLM(rawText);
+    console.log("LLM extraction complete. Data structure:");
+    console.log(`Skills: ${extractedData.skills.length} items`);
+    console.log(`Experience: ${extractedData.experience.length} items`);
+    console.log(`Projects: ${extractedData.projects.length} items`);
+
+    // Return the extracted and normalized data
+    return {
+      ...extractedData,
+      rawText,
+    };
+  } catch (error) {
+    console.error("Error parsing resume with LLM:", error);
+    return {
+      skills: [],
+      experience: [],
+      projects: [],
+      rawText: "",
+    };
+  }
+}
+
+export { parseResumeWithLLM, extractResumeDataWithLLM };

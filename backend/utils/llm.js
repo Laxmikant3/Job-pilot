@@ -1,0 +1,785 @@
+import dotenv from "dotenv";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Load environment variables
+dotenv.config();
+
+// Initialize Gemini API with the API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Internal matching functions
+const calculateSkillsMatch = (requiredSkills, candidateSkills) => {
+  if (!requiredSkills || !candidateSkills) return 0;
+  if (!requiredSkills.length) return 1;
+
+  const normalizedRequired = requiredSkills.map((s) => s.toLowerCase());
+  const normalizedCandidate = candidateSkills.map((s) => s.toLowerCase());
+
+  const matchedSkills = normalizedRequired.filter((skill) =>
+    normalizedCandidate.some((candSkill) => candSkill.includes(skill))
+  );
+
+  return matchedSkills.length / requiredSkills.length;
+};
+
+const calculateExperienceMatchScore = (job, candidate) => {
+  const requiredYears = job.experience?.minYears || 0;
+  const candidateYears = Array.isArray(candidate.experience)
+    ? candidate.experience.reduce((total, exp) => {
+        try {
+          if (!exp?.startDate) return total;
+
+          const start = new Date(exp.startDate);
+          if (isNaN(start.getTime())) return total;
+
+          const end =
+            exp.endDate === "Present" || !exp.endDate
+              ? new Date()
+              : new Date(exp.endDate);
+          if (isNaN(end.getTime())) return total;
+
+          const months =
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth());
+          return total + months / 12;
+        } catch (error) {
+          console.warn("Error calculating experience duration:", error);
+          return total;
+        }
+      }, 0)
+    : 0;
+
+  return Math.min(candidateYears / Math.max(requiredYears, 1), 1);
+};
+
+const internalCalculateMatchScore = (job, candidate) => {
+  const skillsScore = calculateSkillsMatch(
+    job.requiredSkills,
+    candidate.skills
+  );
+  const experienceScore = calculateExperienceMatchScore(job, candidate);
+  return Math.round((skillsScore * 0.7 + experienceScore * 0.3) * 100);
+};
+
+/**
+ * Helper function to generate fallback analysis when LLM fails
+ */
+const generateFallbackAnalysis = (job, candidate) => {
+  const score = internalCalculateMatchScore(job, candidate);
+  const matchedSkills = (job.requiredSkills || []).filter((skill) =>
+    (candidate.skills || []).some(
+      (candSkill) =>
+        candSkill.toLowerCase().includes(skill.toLowerCase()) ||
+        skill.toLowerCase().includes(candSkill.toLowerCase())
+    )
+  );
+
+  const strengths = matchedSkills.map((skill) => `Strong match in ${skill}`);
+  const gaps = ["Unable to perform detailed analysis"];
+  const recommendation =
+    score >= 70 ? "Consider for interview" : "Review application details";
+
+  return {
+    strengths,
+    weaknesses: gaps,
+    overallFit:
+      score >= 70 ? "Good potential match" : "Further evaluation needed",
+    recommendation,
+    score,
+    confidence: 0.5,
+    language: "en",
+    strengthsAndWeaknesses: {
+      strengths,
+      gaps,
+      recommendation,
+    },
+    suggestedQuestions: [
+      "Can you describe your experience with " +
+        (job.requiredSkills || []).join(", ") +
+        "?",
+      "What projects have you worked on that are relevant to this role?",
+    ],
+  };
+};
+
+/**
+ * Send a prompt to the LLM and get a response
+ * @param {string} prompt - The prompt to send to the LLM
+ * @returns {Promise<string>} - The text response from the LLM
+ */
+// Cache to store recent requests and prevent duplicates
+const requestCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds cache TTL
+
+// Track the last request time for delay calculation
+let lastRequestTime = 0;
+// Default delay between API calls (10 seconds)
+const DEFAULT_DELAY = 10000;
+
+/**
+ * Helper function to introduce a delay
+ * @param {number} ms - Milliseconds to delay
+ * @returns {Promise<void>}
+ */
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Send a prompt to the LLM and get a response
+ * @param {string} prompt - The prompt to send to the LLM
+ * @param {Object} options - Additional options
+ * @param {boolean} options.skipDelay - If true, skip the delay (use with caution)
+ * @param {number} options.customDelay - Custom delay in milliseconds
+ * @param {boolean} options.forceDelay - If true, apply the full delay regardless of time since last request
+ * @returns {Promise<string>} - The text response from the LLM
+ */
+export const getLLMResponse = async (prompt, options = {}) => {
+  try {
+    // Check if we have this prompt in cache
+    if (requestCache.has(prompt)) {
+      console.log("Using cached Gemini API response...");
+      return requestCache.get(prompt);
+    }
+
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+
+    // Calculate how much time we need to wait before making another request
+    // Option 1: skipDelay - skip any delay (use with caution)
+    // Option 2: forceDelay - apply the full delay regardless of time since last request
+    // Option 3: normal behavior - apply remaining delay based on time since last request
+    if (!options.skipDelay) {
+      const delayTime = options.customDelay || DEFAULT_DELAY;
+
+      if (options.forceDelay) {
+        // Apply full delay regardless of time since last request
+        console.log(
+          `Applying full delay of ${delayTime}ms before LLM request...`
+        );
+        await delay(delayTime);
+      } else if (lastRequestTime > 0) {
+        // Calculate remaining delay based on time since last request
+        const remainingDelay = delayTime - timeSinceLastRequest;
+
+        if (remainingDelay > 0) {
+          console.log(
+            `Waiting ${remainingDelay}ms before making next LLM request...`
+          );
+          await delay(remainingDelay);
+        }
+      }
+    }
+
+    // Update last request time after any delay
+    lastRequestTime = Date.now();
+
+    console.log("Making request to Gemini API...");
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const responseText = response.text();
+
+    // Cache the response
+    requestCache.set(prompt, responseText);
+
+    // Set timeout to clear this cache entry
+    setTimeout(() => {
+      requestCache.delete(prompt);
+    }, CACHE_TTL);
+
+    return responseText;
+  } catch (error) {
+    console.error("LLM Response Error:", error);
+    throw new Error(`Failed to get LLM response: ${error.message}`);
+  }
+};
+
+// Language-specific analysis templates
+const analysisTemplates = {
+  en: {
+    instruction: "Analyze this candidate's fit for the job position",
+    strengthsLabel: "Key Strengths",
+    weaknessesLabel: "Areas for Improvement",
+    fitLabel: "Overall Fit",
+    recommendationLabel: "Recommendation",
+  },
+  // Add more languages as needed
+};
+
+/**
+ * Format experience data for LLM prompt
+ */
+const formatExperience = (experience = []) => {
+  if (!Array.isArray(experience)) return "No experience data available";
+
+  return (
+    experience
+      .filter((exp) => exp && (exp.title || exp.company || exp.description)) // Filter out empty entries
+      .map((exp) => {
+        const title = exp.title || "Role";
+        const company = exp.company || "Company";
+        const startDate = exp.startDate || "Unknown";
+        const endDate = exp.endDate || "Present";
+        const description = exp.description || "No description provided";
+
+        return `${title} at ${company} (${startDate} - ${endDate}): ${description}`;
+      })
+      .join("\n") || "No experience listed"
+  );
+};
+
+/**
+ * Format education data for LLM prompt
+ */
+const formatEducation = (education = []) => {
+  if (!Array.isArray(education)) return "No education data available";
+
+  return (
+    education
+      .filter((edu) => edu && (edu.degree || edu.institution || edu.field)) // Filter out empty entries
+      .map((edu) => {
+        const degree = edu.degree || "Degree";
+        const institution = edu.institution || "Institution";
+        const field = edu.field ? ` (${edu.field})` : "";
+        return `${degree} from ${institution}${field}`;
+      })
+      .join("\n") || "No education listed"
+  );
+};
+
+/**
+ * Format projects data for LLM prompt
+ */
+const formatProjects = (projects = []) => {
+  if (!Array.isArray(projects)) return "No project data available";
+
+  return (
+    projects
+      .filter(
+        (proj) => proj && (proj.name || proj.description || proj.technologies)
+      ) // Filter out empty entries
+      .map((proj) => {
+        const name = proj.name || "Unnamed Project";
+        const tech = proj.technologies
+          ? ` using ${proj.technologies.join(", ")}`
+          : "";
+        const desc = proj.description ? `: ${proj.description}` : "";
+        return `${name}${tech}${desc}`;
+      })
+      .join("\n") || "No projects listed"
+  );
+};
+
+/**
+ * Parse the structured response from LLM, handling potential corrupted data
+ */
+const parseStructuredResponse = (response, template) => {
+  try {
+    // First attempt: Try parsing by numeric prefixes
+    const sections = response.split(/\d\./).filter(Boolean);
+
+    // If we don't have enough sections, try alternate parsing strategies
+    if (sections.length < 4) {
+      // Look for template labels as delimiters
+      const labelSections = splitByLabels(response, template);
+      if (labelSections) {
+        return labelSections;
+      }
+    }
+
+    // Clean and validate each section
+    const cleanedSections = sections.map((section) => {
+      let cleaned = section.trim();
+
+      // If section contains potential corruption (like "Note:" or "Explanation:"),
+      // take only the content before it
+      const corruptionMarkers = [
+        "Note:",
+        "Explanation:",
+        "Summary:",
+        "Additional:",
+        "Remember:",
+        "Important:",
+      ];
+      for (const marker of corruptionMarkers) {
+        const markerIndex = cleaned.indexOf(marker);
+        if (markerIndex !== -1) {
+          cleaned = cleaned.substring(0, markerIndex).trim();
+        }
+      }
+
+      // Remove any JSON-like structures or code blocks that might have been added
+      cleaned = cleaned.replace(/\{[\s\S]*?\}/g, "").trim();
+      cleaned = cleaned.replace(/```[\s\S]*?```/g, "").trim();
+
+      return cleaned;
+    });
+
+    // Ensure we have content for each section
+    return {
+      strengths: cleanedSections[0] || "No strengths analysis provided",
+      weaknesses: cleanedSections[1] || "No weaknesses analysis provided",
+      overallFit: cleanedSections[2] || "No overall fit analysis provided",
+      recommendation: cleanedSections[3] || "No recommendation provided",
+    };
+  } catch (error) {
+    console.error("Error parsing LLM response:", error);
+    // Return default structure with error indicators
+    return {
+      strengths: "Error parsing strengths",
+      weaknesses: "Error parsing weaknesses",
+      overallFit: "Error parsing overall fit",
+      recommendation: "Unable to provide recommendation due to parsing error",
+    };
+  }
+};
+
+/**
+ * Split response by template labels when numeric splitting fails
+ */
+const splitByLabels = (response, template) => {
+  try {
+    const labels = [
+      template.strengthsLabel,
+      template.weaknessesLabel,
+      template.fitLabel,
+      template.recommendationLabel,
+    ];
+
+    let sections = {};
+    let lastIndex = 0;
+
+    // Find content between each label
+    for (let i = 0; i < labels.length; i++) {
+      const currentLabel = labels[i];
+      const nextLabel = labels[i + 1];
+
+      const startIndex = response.indexOf(currentLabel, lastIndex);
+      if (startIndex === -1) continue;
+
+      const endIndex = nextLabel
+        ? response.indexOf(nextLabel, startIndex + currentLabel.length)
+        : response.length;
+
+      if (endIndex === -1) continue;
+
+      // Extract and clean the content
+      let content = response
+        .substring(startIndex + currentLabel.length, endIndex)
+        .trim();
+
+      // Remove any corruption markers
+      const corruptionMarkers = [
+        "Note:",
+        "Explanation:",
+        "Summary:",
+        "Additional:",
+        "Remember:",
+        "Important:",
+      ];
+      for (const marker of corruptionMarkers) {
+        const markerIndex = content.indexOf(marker);
+        if (markerIndex !== -1) {
+          content = content.substring(0, markerIndex).trim();
+        }
+      }
+
+      // Map the content to the appropriate field
+      if (currentLabel === template.strengthsLabel)
+        sections.strengths = content;
+      if (currentLabel === template.weaknessesLabel)
+        sections.weaknesses = content;
+      if (currentLabel === template.fitLabel) sections.overallFit = content;
+      if (currentLabel === template.recommendationLabel)
+        sections.recommendation = content;
+
+      lastIndex = endIndex;
+    }
+
+    // Only return if we found at least some sections
+    if (Object.keys(sections).length > 0) {
+      return {
+        strengths: sections.strengths || "No strengths analysis provided",
+        weaknesses: sections.weaknesses || "No weaknesses analysis provided",
+        overallFit: sections.overallFit || "No overall fit analysis provided",
+        recommendation: sections.recommendation || "No recommendation provided",
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error in label-based parsing:", error);
+    return null;
+  }
+};
+
+/**
+ * Calculate a confidence score based on the analysis
+ */
+const calculateConfidenceScore = (analysis) => {
+  try {
+    // Start with perfect confidence
+    let confidence = 1.0;
+
+    // Calculate completeness of each section
+    const sections = [
+      "strengths",
+      "weaknesses",
+      "overallFit",
+      "recommendation",
+    ];
+    sections.forEach((section) => {
+      if (!analysis[section]) {
+        confidence -= 0.25; // Deduct 25% for each missing section
+      } else {
+        // Deduct up to 10% per section based on content length/quality
+        const content = analysis[section];
+        if (content.length < 10) confidence -= 0.1;
+        else if (content.length < 50) confidence -= 0.05;
+      }
+    });
+
+    // Ensure confidence stays between 0 and 1
+    return Math.max(0, Math.min(1, confidence));
+  } catch (error) {
+    console.error("Error calculating confidence score:", error);
+    return 0.5; // Return moderate confidence on error
+  }
+};
+
+/**
+ * Extract suggested interview questions from the LLM response
+ */
+const extractSuggestedQuestions = (response) => {
+  try {
+    // Look for questions in the response (sentences ending with question marks)
+    const questions = response.match(/[^.!?]*\?/g) || [];
+
+    // Filter and clean up the questions
+    return questions
+      .map((q) => q.trim())
+      .filter((q) => q.length > 10) // Filter out very short questions
+      .slice(0, 5); // Limit to 5 questions
+  } catch (error) {
+    console.error("Error extracting suggested questions:", error);
+    return []; // Return empty array on error
+  }
+};
+
+/**
+ * Analyze a candidate's fit for a job with multi-language support
+ */
+export const analyzeCandidate = async (job, candidateData, language = "en") => {
+  try {
+    // Validate and normalize input data
+    const normalizedJob = {
+      title: job?.title || "",
+      requiredSkills: job?.requiredSkills || [],
+      requirements: {
+        experience: job?.requirements?.experience,
+        education: job?.requirements?.education || {},
+      },
+      description: job?.description || "",
+    };
+
+    const normalizedCandidate = {
+      skills: candidateData?.skills || [],
+      experience: candidateData?.experience || [],
+      education: candidateData?.education || [],
+      projects: candidateData?.projects || [],
+    };
+
+    const template = analysisTemplates[language] || analysisTemplates.en;
+
+    // Create a structured analysis prompt
+    const prompt = `
+      ${template.instruction}:
+
+      JOB REQUIREMENTS:
+      Title: ${normalizedJob.title}
+      Required Skills: ${normalizedJob.requiredSkills.join(", ")}
+      Experience Needed: ${
+        normalizedJob.requirements.experience || "Not specified"
+      } years
+      Education: ${
+        normalizedJob.requirements.education.level || "Not specified"
+      }
+      
+      CANDIDATE PROFILE:
+      Skills: ${normalizedCandidate.skills.join(", ")}
+      Experience: ${formatExperience(normalizedCandidate.experience)}
+      Education: ${formatEducation(normalizedCandidate.education)}
+      Projects: ${formatProjects(normalizedCandidate.projects)}
+
+      Provide a detailed analysis with the following structure:
+      1. ${template.strengthsLabel}
+      2. ${template.weaknessesLabel}
+      3. ${template.fitLabel}
+      4. ${template.recommendationLabel}
+
+      Focus on specific examples and provide clear rationale for your assessment.
+      If possible, suggest potential interview questions based on any gaps or areas that need clarification.
+    `;
+
+    // Get LLM response and parse analysis
+    let response, analysis;
+    try {
+      response = await getLLMResponse(prompt);
+      analysis = parseStructuredResponse(response, template);
+      const score = internalCalculateMatchScore(
+        normalizedJob,
+        normalizedCandidate
+      );
+      const confidence = calculateConfidenceScore(analysis);
+
+      // Return analysis with strengthsAndWeaknesses correctly structured
+      return {
+        ...analysis,
+        score,
+        confidence,
+        language: "en",
+        suggestedQuestions: extractSuggestedQuestions(response),
+        strengthsAndWeaknesses: {
+          strengths: analysis.strengths || [],
+          gaps: analysis.weaknesses || [],
+          recommendation: analysis.recommendation || "",
+        },
+      };
+    } catch (error) {
+      console.error("LLM Processing Error:", error);
+      return generateFallbackAnalysis(normalizedJob, normalizedCandidate);
+    }
+  } catch (error) {
+    console.error("LLM Analysis Error:", error);
+    return generateFallbackAnalysis(job, candidateData);
+  }
+};
+
+/**
+ * Generate a chat response for user messages
+ */
+export const generateChatResponse = async (
+  context,
+  message,
+  language = "en"
+) => {
+  try {
+    const prompt = `
+      Context: You are a helpful AI assistant for a job application platform.
+      Previous context: ${context}
+      User message: ${message}
+      
+      Please provide a helpful and professional response in ${language} language.
+    `;
+
+    return await getLLMResponse(prompt);
+  } catch (error) {
+    console.error("Chat Response Error:", error);
+    throw new Error("Failed to generate chat response");
+  }
+};
+
+/**
+ * Translate text to a specified language
+ */
+export const translateText = async (text, targetLanguage) => {
+  try {
+    const prompt = `
+      Translate the following text to ${targetLanguage}:
+      
+      ${text}
+      
+      Provide only the translated text with no additional explanations.
+    `;
+
+    return await getLLMResponse(prompt);
+  } catch (error) {
+    console.error("Translation Error:", error);
+    throw new Error("Failed to translate text");
+  }
+};
+
+/**
+ * Detect the language of input text
+ */
+export const detectLanguage = async (text) => {
+  try {
+    const prompt = `
+      Detect the language of the following text and return ONLY the ISO 639-1 language code (e.g., 'en' for English, 'es' for Spanish, etc.):
+      
+      ${text}
+      
+      Respond with only the two-letter language code and nothing else.
+    `;
+
+    return (await getLLMResponse(prompt)).trim().toLowerCase();
+  } catch (error) {
+    console.error("Language Detection Error:", error);
+    return "en"; // Default to English if detection fails
+  }
+};
+
+/**
+ * Format job description for a specific locale
+ */
+export const localizeJobDescription = async (job, targetLanguage) => {
+  if (targetLanguage === "en") return job; // Skip translation for English
+
+  try {
+    // Translate main fields
+    const [title, description] = await Promise.all([
+      translateText(job.title, targetLanguage),
+      translateText(job.description, targetLanguage),
+    ]);
+
+    // Create a new object with translated fields
+    return {
+      ...job,
+      title,
+      description,
+    };
+  } catch (error) {
+    console.error("Job Localization Error:", error);
+    return job; // Return original job if translation fails
+  }
+};
+
+/**
+ * Evaluate a candidate's screening question responses
+ */
+export const evaluateScreeningResponses = async (
+  application,
+  job,
+  language = "en"
+) => {
+  const template = analysisTemplates[language] || analysisTemplates.en;
+  const results = [];
+
+  for (const response of application.screeningResponses) {
+    const question = job.screeningQuestions.find(
+      (q) => q._id.toString() === response.question.toString()
+    );
+
+    if (!question) continue;
+
+    try {
+      const prompt = `
+      You are an AI evaluator that must output only valid JSON.
+IMPORTANT: Your entire response must be a single valid JSON object with no additional text, comments, or explanations.
+
+Evaluate this candidate's response to a job screening question:
+
+Input Data:
+- Job Position: "${job.title}"
+- Question: "${question.question}"
+- Response: "${response.response}"
+
+INSTRUCTIONS:
+Evaluate the response and output a JSON object with exactly these fields:
+{
+  "score": number between 0-100,
+  "feedback": string with evaluation feedback,
+  "confidence": number between 0-1,
+  "flags": array of strings for concerns,
+  "strengths": array of strings for positive points
+}
+
+REQUIREMENTS:
+- Output must be parseable JSON
+- Do not include any text before or after the JSON
+- Do not include any explanations or comments
+- All fields must be present
+      `;
+
+      const result = await getLLMResponse(prompt);
+      const evaluation = JSON.parse(result);
+
+      if (evaluation) {
+        results.push({
+          questionId: question._id,
+          evaluation,
+        });
+      } else {
+        throw new Error("Failed to extract valid evaluation from LLM response");
+      }
+    } catch (error) {
+      console.error(
+        `Error evaluating response for question ${question._id}:`,
+        error
+      );
+      results.push({
+        questionId: question._id,
+        error: "Failed to evaluate response",
+        evaluation: {
+          score: 0,
+          feedback: "Error processing response",
+          confidence: 0,
+          flags: ["evaluation_error"],
+          strengths: [],
+        },
+      });
+    }
+  }
+
+  // Calculate overall screening score
+  const validScores = results
+    .filter((r) => r.evaluation?.score)
+    .map((r) => r.evaluation.score);
+
+  const overallScore =
+    validScores.length > 0
+      ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length)
+      : 0;
+
+  return {
+    responses: results,
+    overallScore,
+    confidence:
+      results.reduce((acc, r) => acc + (r.evaluation?.confidence || 0), 0) /
+      Math.max(results.length, 1), // Prevent division by zero
+  };
+};
+
+/**
+ * Generate overall evaluation
+ */
+export const generateOverallEvaluation = async (application, job) => {
+  const screeningEval = await evaluateScreeningResponses(application, job);
+  const resumeEval = await analyzeCandidate(application, job);
+
+  // Calculate weighted scores
+  const weights = {
+    screening: 0.4,
+    resume: 0.4,
+    llmAnalysis: 0.2,
+  };
+
+  const totalScore = Math.round(
+    screeningEval.overallScore * weights.screening +
+      (application.matchingScores?.total || 0) * weights.resume +
+      resumeEval.confidence * 100 * weights.llmAnalysis
+  );
+
+  // Determine recommendation strength
+  let recommendationStrength = "maybe";
+  if (totalScore >= 85) recommendationStrength = "strong_yes";
+  else if (totalScore >= 70) recommendationStrength = "yes";
+  else if (totalScore <= 30) recommendationStrength = "strong_no";
+  else if (totalScore <= 50) recommendationStrength = "no";
+
+  return {
+    totalScore,
+    breakdown: {
+      screeningQuestionsScore: screeningEval.overallScore,
+      resumeMatchScore: application.matchingScores?.total || 0,
+      llmAnalysisScore: Math.round(resumeEval.confidence * 100),
+    },
+    flags: [
+      ...new Set([
+        ...screeningEval.responses.flatMap((r) => r.evaluation?.flags || []),
+        ...(resumeEval.weaknesses ? ["weak_experience"] : []),
+      ]),
+    ],
+    recommendationStrength,
+    confidence: (screeningEval.confidence + resumeEval.confidence) / 2,
+  };
+};
