@@ -84,25 +84,27 @@ Using advanced **AI models** like *Gemini 1.5 Flash* (or any other LLM), the sys
 ---
 
 ## 🗂️ Project Structure
+\`\`\`
 Job-Pilot/
-├── frontend/                     # React.js Frontend
-│   ├── src/                      # Main source code (components, pages, etc.)
-│   ├── public/                   # Static assets (icons, logos, index.html)
-│   └── package.json              # Frontend dependencies and scripts
+├── frontend/                # React.js Frontend
+│   ├── src/
+│   ├── public/
+│   └── package.json
 │
-├── backend/                      # Node.js Backend
-│   ├── controllers/              # API Controllers (business logic)
-│   ├── models/                   # MongoDB Models (schemas)
-│   ├── routes/                   # Express Routes (API endpoints)
-│   ├── middleware/               # Authentication & authorization middleware
-│   ├── utils/                    # Helper functions (e.g., resume parser, AI utils)
-│   ├── config/                   # Database & cloud configuration
-│   └── server.js                 # Main server entry point
+├── backend/                 # Node.js Backend
+│   ├── controllers/         # API Controllers
+│   ├── models/              # MongoDB Models
+│   ├── routes/              # Express Routes
+│   ├── middleware/          # Auth Middleware
+│   ├── utils/               # Helper Functions
+│   ├── config/              # DB and Cloud Config
+│   └── server.js
 │
-├── .env                          # Environment variables (keys, secrets, configs)
-└── README.md                     # Project documentation
+├── .env                     # Environment Variables
+└── README.md
+\`\`\`
 
-
+---
 
 
 ## 🖥️ Admin Dashboard
