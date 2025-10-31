@@ -1,109 +1,116 @@
-🧭 Job-Pilot
+# 🚀 Job Application & Resume Screening Platform (MERN Stack)
 
-Job-Pilot is a full-stack web application designed to connect job seekers and recruiters in a single platform.
-It provides an AI-powered job hiring system where candidates can apply for jobs, give coding and aptitude tests, and appear for interviews — while recruiters can manage applications, conduct interviews, and evaluate performance.
+Welcome to the **Job Application & Resume Screening Platform**, a comprehensive, full-stack solution for automating the job application process. This platform helps **companies** manage their hiring processes while providing a smooth and seamless experience for **candidates**. By integrating advanced technologies like **AI-driven resume matching**, **multi-lingual capabilities**, and **Cloudinary for file storage**, this platform revolutionizes the way recruitment works.
 
-🚀 Features
-👨‍💼 For Job Seekers:
+---
 
-Create a professional profile and upload resumes.
+## 📋 Table of Contents
 
-Attempt aptitude and coding tests.
+1. [Introduction](#introduction)
+2. [Features](#features)
+3. [Tech Stack](#tech-stack)
+4. [Project Structure](#project-structure)
+5. [Admin Dashboard](#admin-dashboard)
+6. [Candidate Experience](#candidate-experience)
+7. [Admin Features](#admin-features)
+8. [AI Integration](#ai-integration)
+9. [Environment Setup](#environment-setup)
 
-Attend live interview sessions with screen-sharing support.
+---
 
-Track application progress and results.
+## 🌟 Introduction
 
-🏢 For Recruiters / Companies:
+The **Job Application & Resume Screening Platform** is designed for **companies** to manage their hiring process seamlessly and for **candidates** to apply for jobs easily. The platform automates several aspects of recruitment, making it faster and more accurate. Admins can post jobs, review resumes, shortlist candidates, and track the application process, while candidates can upload resumes, fill out necessary forms, and get instant feedback.
 
-Post job openings with required skills and test details.
+By leveraging **AI-driven technologies** like **Gemini 1.5 Flash** (or another suitable **multi-lingual AI model**), the platform matches resumes against job requirements and provides reasoning behind every candidate shortlist.
 
-Review candidate profiles, test results, and interview feedback.
+---
 
-Conduct interviews directly through the platform.
+## ✨ Features
 
-Manage and track candidates efficiently.
+### Core Features
 
-🔒 Authentication:
+1. **📄 Resume Upload and Parsing**  
+   - Upload resumes in **PDF** or **DOCX** format.  
+   - Automatic parsing to extract essential details like **Name**, **Email**, **Skills**, **Experience**, **Education**, and **Projects**.  
+   - Secure file storage in **Cloudinary**.
 
-Secure login using Supabase Auth with Email-Password and LinkedIn OAuth.
+2. **📋 Job Postings for Companies**  
+   - Post multiple job listings with details like **Job Title**, **Description**, **Skills**, **Experience**, and **Location**.  
+   - Specify the number of candidates to shortlist.  
+   - Store job postings in **MongoDB** for easy management.
 
-💬 Interview System:
+3. **🤖 Resume Matching Logic**  
+   - Evaluate candidates based on skills, experience, and education using a **threshold-based matching algorithm**.  
+   - Use **AI-driven fallback mechanisms** for advanced evaluation and reasoning.
 
-Interviewer can view candidate’s screen and code in real time.
+4. **💬 Interactive Candidate Chatbot**  
+   - Engage candidates with application questions in multiple languages.  
+   - Use AI to process and respond to inquiries.
 
-Built-in code editor and chat for interaction.
+5. **📊 Admin Dashboard for Candidate Review**  
+   - Review resumes, view detailed profiles, and shortlist candidates based on AI-driven scores.  
+   - Ensure fairness and transparency with AI reasoning.
 
-🧠 AI Assistance:
+6. **📨 In-App Messaging**  
+   - Send personalized, **bulk messages** to candidates for interviews, rejections, or notifications.
 
-Integrated AI helper to generate coding questions and analyze responses.
+---
 
-🛠️ Tech Stack
-Layer	Technology
-Frontend	React.js, Vite, Tailwind CSS
-Backend	Node.js, Express.js
-Database	Supabase (PostgreSQL)
-Authentication	Supabase Auth (Email + LinkedIn OAuth)
-Cloud Storage	Supabase Storage
-Realtime Communication	WebRTC / Socket.io
-AI Integration	OpenAI / Gemini API (for question generation & evaluation)
-📂 Project Structure
-Job-Pilot/
-├── frontend/                     # React.js Frontend
-│   ├── src/                      # Main source code (components, pages, hooks)
-│   │   ├── components/           # UI Components (Navbar, Dashboard, etc.)
-│   │   ├── pages/                # App Pages (Login, Register, Test, Interview)
-│   │   ├── context/              # Global Context (Auth, Test, Interview)
-│   │   ├── utils/                # Helper functions (API calls, constants)
-│   │   └── App.jsx               # Root Component
-│   ├── public/                   # Static assets (icons, logos, index.html)
-│   └── package.json              # Frontend dependencies and scripts
-│
-├── backend/                      # Node.js Backend
-│   ├── controllers/              # API Controllers (business logic)
-│   ├── models/                   # MongoDB Models (schemas)
-│   ├── routes/                   # Express Routes (API endpoints)
-│   ├── middleware/               # Authentication & authorization middleware
-│   ├── utils/                    # Helper functions (AI utils, resume parser)
-│   ├── config/                   # Database & cloud configuration
-│   └── server.js                 # Main server entry point
-│
-├── .env                          # Environment variables (API keys, DB URLs)
-└── README.md                     # Project documentation
+## 🛠️ Tech Stack
 
-⚙️ Installation & Setup
-1️⃣ Clone the repository:
-git clone https://github.com/THE-DEEPDAS/Medhavi-Full.git
-cd Job-Pilot
+### Frontend
+- **React.js** for building the user interface  
+- **React-FA icons** for UI components  
+- **Axios** for API requests  
+- **React-Router** for routing  
+- **Formik** for form handling and validation
 
-2️⃣ Setup Frontend:
-cd frontend
-npm install
-npm run dev
+### Backend
+- **Node.js** and **Express.js** for server-side logic  
+- **MongoDB** for database management  
+- **JWT** for user authentication  
+- **Multer** for file uploads  
+- **Cloudinary** for file storage
 
-3️⃣ Setup Backend:
-cd backend
-npm install
-npm run dev
+### AI/LLM
+- **Gemini 1.5 Flash** for resume evaluation and reasoning  
+- Multi-lingual capabilities for global reach
 
-4️⃣ Configure Environment Variables:
+---
 
-Create a .env file in the backend folder and add:
+## 🗂️ Project Structure
 
-PORT=5100
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_KEY=your_supabase_api_key
-JWT_SECRET=your_secret_key
-OPENAI_API_KEY=your_openai_key
+```bash
+frontend/                    # Frontend (React.js)
+backend/                     # Backend (Node.js)
+  ├── controllers/           # API Controllers
+  ├── models/                # MongoDB Models
+  ├── routes/                # API Routes
+  ├── middleware/            # Authentication and Authorization
+  ├── utils/                 # Helper functions
+  ├── config/                # Configuration files
+.env                         # Environment variables
+```
 
-🧩 Workflow
+---
 
-User signs up or logs in using Supabase Auth.
+## 🖥️ Admin Dashboard
 
-Job seeker completes profile and starts aptitude or coding tests.
+The Admin Dashboard allows HR representatives (Company admins) to perform the following tasks:
 
-Recruiter posts jobs and reviews applicants’ performance.
+- **Job Post Management**: Create, edit, or delete job postings. Set job requirements like skills, experience, and number of candidates to shortlist.
+- **Resume Review**: Review candidate resumes and shortlisting candidates based on matching scores. View AI-driven explanations for shortlisted candidates.
+- **In-App Messaging**: Communicate directly with candidates to schedule interviews or notify them of status updates.
+- **Job Analytics**: Track the performance of job posts, including the number of applications, shortlisted candidates, and candidate diversity.
 
-Interview round conducted with integrated screen-sharing and live code editor.
+---
 
-Recruiter finalizes candidate and updates job status.
+## 👩‍💻 Candidate Experience
+
+Candidates have a straightforward and intuitive experience:
+
+- Upload their resume (PDF/DOCX) and fill out application-specific questions.
+- The AI matches their resume against the job posting’s requirements and provides feedback.
+- Candidates are notified of their application status (e.g., Shortlisted, Not Selected).
+- Real-time feedback helps candidates improve their chances by adjusting their profiles and resumes for future applications.
