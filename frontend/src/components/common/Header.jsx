@@ -26,7 +26,7 @@ const Header = () => {
               icon="briefcase"
               className="text-primary-500 mr-2"
             />
-            <span>Medhavi</span>
+            <span>Job-Pilot</span>
           </Link>
 
           {/* Navigation */}

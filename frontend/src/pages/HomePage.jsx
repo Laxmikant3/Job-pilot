@@ -227,7 +227,7 @@ const HomePage = () => {
             </h2>
             <div className="w-24 h-1 bg-primary-500 mx-auto mt-4 mb-6"></div>
             <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-              See how Medhavi has helped companies find the perfect candidates
+              See how Job-Pilot has helped companies find the perfect candidates
               and job seekers land their dream jobs.
             </p>
           </div>
@@ -241,7 +241,7 @@ const HomePage = () => {
                 </div>
               </div>
               <p className="text-gray-300 mb-6">
-                "Medhavi's AI matching technology helped us find qualified
+                "Job-Pilot's AI matching technology helped us find qualified
                 candidates in half the time. The resume parsing feature saved us
                 countless hours of manual review."
               </p>

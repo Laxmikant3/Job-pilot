@@ -103,7 +103,7 @@ const DashboardLayout = ({ type }) => {
                 icon="briefcase"
                 className="text-primary-500 text-xl mr-2"
               />
-              <span className="font-semibold text-white">Medhavi</span>
+              <span className="font-semibold text-white">Job-Pilot</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -174,7 +174,7 @@ const DashboardLayout = ({ type }) => {
                 icon="briefcase"
                 className="text-primary-500 text-xl mr-2"
               />
-              <span className="font-semibold text-white">Medhavi</span>
+              <span className="font-semibold text-white">Job-Pilot</span>
             </div>
 
             {/* Desktop Navigation Links */}

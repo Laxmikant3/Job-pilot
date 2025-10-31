@@ -17,7 +17,7 @@ const Footer = () => {
                   icon="briefcase"
                   className="text-primary-500 mr-2 h-6 w-6"
                 />
-                <span>Medhavi</span>
+                <span>Job-Pilot</span>
               </div>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
@@ -148,7 +148,7 @@ const Footer = () => {
                   className="text-primary-500 mt-1 mr-3"
                 />
                 <span className="text-sm text-gray-400">
-                  support@medhavi.com
+                  support@Job-Pilot.com
                 </span>
               </li>
               <li className="flex items-start">
@@ -177,7 +177,7 @@ const Footer = () => {
         <div className="border-t border-gray-700 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-sm text-gray-400">
-              &copy; {currentYear} Medhavi. All rights reserved.
+              &copy; {currentYear} Job-Pilot. All rights reserved.
             </p>
             <div className="flex space-x-6">
               <Link
