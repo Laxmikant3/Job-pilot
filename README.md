@@ -84,7 +84,6 @@ Using advanced **AI models** like *Gemini 1.5 Flash* (or any other LLM), the sys
 ---
 
 ## 🗂️ Project Structure
-\`\`\`
 Job-Pilot/
 ├── frontend/                     # React.js Frontend
 │   ├── src/                      # Main source code (components, pages, etc.)
@@ -103,9 +102,6 @@ Job-Pilot/
 ├── .env                          # Environment variables (keys, secrets, configs)
 └── README.md                     # Project documentation
 
-\`\`\`
-
----
 
 ## 🖥️ Admin Dashboard
 The **Admin Dashboard** empowers HR teams to:
